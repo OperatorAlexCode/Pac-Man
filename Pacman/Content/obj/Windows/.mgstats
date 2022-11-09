@@ -1,0 +1,6 @@
+Source File,Dest File,Processor Type,Content Type,Source File Size,Dest File Size,Build Seconds
+"C:/Users/alexa/source/repos/Pacman/Pacman/Content/GameFont.spritefont","C:/Users/alexa/source/repos/Pacman/Pacman/Content/bin/Windows/GameFont.xnb","FontDescriptionProcessor","SpriteFontContent",2068,21535,0,3631064
+"C:/Users/alexa/source/repos/Pacman/Pacman/Content/PacManLogo.png","C:/Users/alexa/source/repos/Pacman/Pacman/Content/bin/Windows/PacManLogo.xnb","TextureProcessor","Texture2DContent",195918,1402853,0,1492576
+"C:/Users/alexa/source/repos/Pacman/Pacman/Content/PacManSpriteSheet.png","C:/Users/alexa/source/repos/Pacman/Pacman/Content/bin/Windows/PacManSpriteSheet.xnb","TextureProcessor","Texture2DContent",8017,145365,0,0123578
+"C:/Users/alexa/source/repos/Pacman/Pacman/Content/SpriteSheet.png","C:/Users/alexa/source/repos/Pacman/Pacman/Content/bin/Windows/SpriteSheet.xnb","TextureProcessor","Texture2DContent",3391,60565,0,0068381
+"C:/Users/alexa/source/repos/Pacman/Pacman/Content/Tileset.png","C:/Users/alexa/source/repos/Pacman/Pacman/Content/bin/Windows/Tileset.xnb","TextureProcessor","Texture2DContent",1385,68729,0,0102783
