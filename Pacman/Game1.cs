@@ -11,6 +11,7 @@ using SharpDX.Direct2D1.Effects;
 using System;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
+using System.Diagnostics;
 using System.Linq;
 using System.Transactions;
 using System.Xml.Serialization;
@@ -40,10 +41,13 @@ namespace Pacman
         // Keys
         List<Keys[]> ValidKeyboardInputs = new() { new Keys[] { Keys.W, Keys.S, Keys.A, Keys.D }, new Keys[] { Keys.Up, Keys.Down, Keys.Left, Keys.Right } };
         List<Keys[]> ValidMenuInputs = new() { new Keys[] { Keys.Enter, Keys.R } };
+        List<Keys> SecretInputCode = new() { Keys.Up, Keys.Up, Keys.Down, Keys.Down, Keys.Left, Keys.Right, Keys.Left, Keys.Right,Keys.B, Keys.A,Keys.Space };
+        List<Keys> SecretCodeChache = new();
 
         // Bool
         bool DoRandomLevels = false;
         bool IsGamePadConnected = false;
+        bool KeyIsPressed = false;
 
         // Other
         private GraphicsDeviceManager graphics;
@@ -94,9 +98,12 @@ namespace Pacman
 
             UpdateTimers(deltaTime);
 
-            IsGamePadConnected = GamePad.GetState(1).IsConnected;
+            IsGamePadConnected = GamePad.GetState(PlayerIndex.One).IsConnected;
 
             Keys[] pressedKeys = Keyboard.GetState().GetPressedKeys();
+
+            if (Keyboard.GetState().GetPressedKeyCount() == 0)
+                KeyIsPressed = false;
 
             if (GamePad.GetState(PlayerIndex.One).Buttons.Back == ButtonState.Pressed || Keyboard.GetState().IsKeyDown(Keys.Escape))
                 Exit();
@@ -105,7 +112,45 @@ namespace Pacman
             {
                 case GameState.MainMenu:
                     levelManager = new(new Texture2D[] { TileSet, ItemSpriteSheet, PlayerEnemySpriteSheet }, new int[] { Height, Width, MarginX, MarginY }, new int[] { 32, 32, 1 });
-                    if (pressedKeys.Any(k => ValidMenuInputs[0].Contains(k)) && pressedKeys.Length == 1) {
+                    if (IsGamePadConnected)
+                    {
+                        if (GamePad.GetState(PlayerIndex.One).Buttons.A == ButtonState.Pressed)
+                        {
+                            levelManager.LoadCurrentLevel(out PlayerChar, out GhostManager);
+                            DoRandomLevels = false;
+                            PlayerChar.SetResetLives(PlayerLives);
+                            CurrentState = GameState.InGame;
+                        }
+                        else if (GamePad.GetState(PlayerIndex.One).Buttons.B == ButtonState.Pressed)
+                        {
+                            levelManager.LoadRandomLevel(out PlayerChar, out GhostManager);
+                            DoRandomLevels = true;
+                            PlayerChar.SetResetLives(PlayerLives);
+                            CurrentState = GameState.InGame;
+                        }
+                    }
+
+                    if (pressedKeys.Length == 1 && !KeyIsPressed)
+                    {
+                        KeyIsPressed = true;
+                        
+                        if (pressedKeys[0] == SecretInputCode[SecretCodeChache.Count])
+                         {
+                            SecretCodeChache.Add(pressedKeys[0]);
+                            if (SecretCodeChache.Count == SecretInputCode.Count)
+                            {
+                                levelManager.LoadSecretLevel(out PlayerChar, out GhostManager);
+                                DoRandomLevels = false;
+                                PlayerChar.SetResetLives(PlayerLives);
+                                CurrentState = GameState.InGame;
+                            }   
+                        }
+                        else
+                            SecretCodeChache.Clear();
+                    }
+
+                    if (pressedKeys.Any(k => ValidMenuInputs[0].Contains(k)) && pressedKeys.Length == 1)
+                    {
                         switch (pressedKeys[0])
                         {
                             case Keys.Enter:
@@ -141,17 +186,17 @@ namespace Pacman
                     if (LevelTransitionTimer.IsDone())
                     {
                         SaveStats();
-                        
+
                         if (DoRandomLevels)
                             levelManager.LoadRandomLevel(out PlayerChar, out GhostManager);
-                        else 
+                        else
                             levelManager.LoadNextLevel(out PlayerChar, out GhostManager, out CurrentState);
 
                         if (CurrentState != GameState.GameEnd)
                         {
                             PlayerChar.Score = CurrentPlayerScore;
                             PlayerChar.Lives = CurrentPlayerLives;
-                        } 
+                        }
                     }
                     break;
                 case GameState.LevelLoss:
@@ -214,8 +259,21 @@ namespace Pacman
             KeyboardState keyboard = Keyboard.GetState();
             Keys[] input = keyboard.GetPressedKeys();
             int? inputIndex = null;
+            GamePadDPad dpad = GamePad.GetState(PlayerIndex.One).DPad;
 
-            if (input.Length == 1 && CurrentState == GameState.InGame)
+            if (IsGamePadConnected)
+            {
+                ButtonState[] dpadInputs = new ButtonState[4];
+                dpadInputs[0] = dpad.Up;
+                dpadInputs[1] = dpad.Down;
+                dpadInputs[2] = dpad.Left;
+                dpadInputs[3] = dpad.Right;
+
+                if (Array.FindAll(dpadInputs, i => i == ButtonState.Pressed).Length == 1)
+                    inputIndex = Array.IndexOf(dpadInputs, ButtonState.Pressed);
+            }
+
+            else if (input.Length == 1 && CurrentState == GameState.InGame)
                 foreach (Keys[] inputScheme in ValidKeyboardInputs)
                 {
                     if (inputScheme.Contains(input[0]))
@@ -225,7 +283,7 @@ namespace Pacman
                     }
                 }
 
-            PlayerChar.Update(deltaTime, inputIndex);
+            PlayerChar.Update(deltaTime, inputIndex, GhostManager);
 
             UpdateStats();
 
@@ -237,7 +295,7 @@ namespace Pacman
         {
             LevelTransitionTimer.Update(deltatime);
         }
-        
+
         void UpdateStats()
         {
             PelletsLeft = PlayerChar.PelletAmount;
@@ -269,7 +327,7 @@ namespace Pacman
         {
             PlayerChar.Draw(spriteBatch);
             if (CurrentState == GameState.InGame)
-            GhostManager.Draw(spriteBatch);
+                GhostManager.Draw(spriteBatch);
         }
 
         void DrawHud()
@@ -286,18 +344,18 @@ namespace Pacman
             Vector2 scorePos = new(Width - scoreSize.X, 0);
             Vector2 scoreAmountPos = new(Width - scoreAmountSize.X, scoreSize.Y);
 
-            if (scoreSize.X >= scoreAmountSize.X)
-                scoreAmountPos.X = Width - scoreSize.X / 2;
+            if (scoreSize.X > scoreAmountSize.X)
+                scoreAmountPos.X = scorePos.X + scoreSize.X / 2 - scoreAmountSize.X / 2;
 
             else
-                scorePos.X = Width - scoreAmountSize.X / 2;
+                scorePos.X = scoreAmountPos.X + scoreAmountSize.X / 2 - scoreSize.X / 2;
 
             DrawStringOnScreen(livesStr, livesPos, 1.5f);
 
             for (int x = 0; x < CurrentPlayerLives; x++)
             {
                 Rectangle destinationRec = new((int)(livesPos.X + livesSize.X + (livesSize.Y * x)), (int)livesPos.Y, (int)livesSize.Y, (int)livesSize.Y);
-                spriteBatch.Draw(PlayerEnemySpriteSheet, destinationRec, new Rectangle(4,1,14,14), Color.White, 0f, new Vector2(), SpriteEffects.None, TextLayer);
+                spriteBatch.Draw(PlayerEnemySpriteSheet, destinationRec, new Rectangle(4, 1, 14, 14), Color.White, 0f, new Vector2(), SpriteEffects.None, TextLayer);
             }
 
             DrawStringOnScreen(scoreStr, scorePos, 1.2f);
@@ -313,7 +371,7 @@ namespace Pacman
 
             float scale = 0.4f;
 
-            Vector2 pos = new(Width/2 - (PacManMenuLogoTex.Width * scale)/2, Height/ 2 - (PacManMenuLogoTex.Height * scale)/2);
+            Vector2 pos = new(Width / 2 - (PacManMenuLogoTex.Width * scale) / 2, Height / 2 - (PacManMenuLogoTex.Height * scale) / 2);
 
             spriteBatch.Draw(PacManMenuLogoTex, pos, null, Color.White, 0f, new Vector2(), scale, SpriteEffects.None, TextLayer);
         }
@@ -331,8 +389,8 @@ namespace Pacman
             Vector2 losePos = new(Width / 2 - (loseSize.X / 2), Height / 3 - (loseSize.Y / 2));
             Vector2 replayPos = new(Width / 2 - (replaySize.X / 2), Height / 2 - (replaySize.Y / 2));
 
-            DrawStringOnScreen(loseStr,losePos,scale);
-            DrawStringOnScreen(replayStr, replayPos,scale);
+            DrawStringOnScreen(loseStr, losePos, scale);
+            DrawStringOnScreen(replayStr, replayPos, scale);
         }
 
         void DrawEndScreen()
@@ -351,9 +409,9 @@ namespace Pacman
             Vector2 replaySize = MeasureString(replayStr) * scale;
 
             Vector2 gameWonPos = new(Width / 2 - (gameWonSize.X / 2), Height / 3 - (gameWonSize.Y / 2));
-            Vector2 finalScorePos = new(Width / 2 - (finalScoreSize.X/2), (gameWonPos.Y + finalScoreSize.Y)*1.1f);
-            Vector2 scorePos = new(Width / 2 - (scoreSize.X / 2), finalScorePos.Y+scoreSize.Y);
-            Vector2 replayPos = new(Width / 2 - (replaySize.X / 2), Height/2 - (replaySize.Y / 2));
+            Vector2 finalScorePos = new(Width / 2 - (finalScoreSize.X / 2), (gameWonPos.Y + finalScoreSize.Y) * 1.1f);
+            Vector2 scorePos = new(Width / 2 - (scoreSize.X / 2), finalScorePos.Y + scoreSize.Y);
+            Vector2 replayPos = new(Width / 2 - (replaySize.X / 2), Height / 2 - (replaySize.Y / 2));
 
             DrawStringOnScreen(gameWonStr, gameWonPos, gameWonScale);
             DrawStringOnScreen(finalScoreStr, finalScorePos, scale);

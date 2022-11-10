@@ -1,6 +1,7 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Pacman.Base_Classes;
+using Pacman.Enums;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,9 +18,13 @@ namespace Pacman.GameObjects
             DestinationRec = destinationRec;
             Vel = vel;
             CurrentTile = currentTile;
+            SpawnPos = currentTile;
             DrawLayer = drawLayer;
             IsMoving = false;
             IsActive = true;
+            CurrentState = GhostState.Normal;
+            RespawnTimer = new();
+            VulnerablityTimer = new();
             AnimationManager = new(CreateSpriteFrames(65), .2f);
         }
 

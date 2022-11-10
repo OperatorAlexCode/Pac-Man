@@ -4,12 +4,14 @@ using Microsoft.Xna.Framework.Graphics;
 using Pacman.Enums;
 using Pacman.Managers;
 using Pacman.Utility;
+using SharpDX.Direct3D11;
 using SharpDX.MediaFoundation;
 using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using Texture2D = Microsoft.Xna.Framework.Graphics.Texture2D;
 using Timer = Pacman.Utility.Timer;
 
 namespace Pacman.GameObjects
@@ -19,7 +21,8 @@ namespace Pacman.GameObjects
         // Float
         //float CurrentRotation;
         float DrawLayer;
-        float GraceDuration = 1.0f;
+        float GraceDuration = 1.5f;
+        float EatGhostTime = 8.0f;
 
         // Int
         public int PelletAmount = 0;
@@ -37,6 +40,10 @@ namespace Pacman.GameObjects
         bool IsHurt;
         bool IsActive = true;
 
+        // Timer
+        Timer GraceTimer;
+        Timer PowerUpTimer;
+
         // Other
         Texture2D Tex;
         public Rectangle DestinationRec;
@@ -44,9 +51,9 @@ namespace Pacman.GameObjects
         PlayerAnimationManager AnimationManager;
         Vector2 Vel;
         Tile[,] TileMap;
-        
         Color CurrentColor;
-        Timer GraceTimer;
+        //public PowerUpType? CurrentPowerUp;
+
 
         public Player(Texture2D tex, Rectangle destinationRec, Vector2 vel, Point currentTile, float drawLayer)
         {
@@ -67,21 +74,25 @@ namespace Pacman.GameObjects
             AnimationManager = new(CreateSpriteFrames(), 0.1f, CurrentState);
 
             GraceTimer = new();
+            PowerUpTimer = new();
         }
 
-        public void Update(float deltaTime, int? moveIndex)
+        public void Update(float deltaTime, int? moveIndex, EnemyManager ghostManager)
         {
-            GraceTimer.Update(deltaTime);
+            UpdateTimers(deltaTime);
 
             if (GraceTimer.IsDone())
-                IsHurt=false;
+                IsHurt = false;
+
+            //if (PowerUpTimer.IsDone() && CurrentPowerUp.HasValue)
+            //    CurrentPowerUp = null;
 
             if (IsHurt)
                 CurrentColor = Color.Red;
             else
                 CurrentColor = Color.White;
 
-          
+
             if (IsActive)
             {
                 if (moveIndex.HasValue && LastMoveIndex != moveIndex.Value)
@@ -89,9 +100,8 @@ namespace Pacman.GameObjects
                 else
                     MoveTo(null);
             }
-            
 
-            AnimationManager.Update(deltaTime, LastMoveIndex,CurrentState);
+            AnimationManager.Update(deltaTime, LastMoveIndex, CurrentState);
 
             if (DestinationTile.HasValue)
                 if (TileMap[DestinationTile.Value.Y, DestinationTile.Value.X].DestinationRec.Contains(DestinationRec.Center))
@@ -102,9 +112,21 @@ namespace Pacman.GameObjects
                             Score += 10;
                             break;
                         case ItemType.Cherry:
+                            Score += 100;
+                            break;
+                        case ItemType.EatGhostPill:
+                            //CurrentPowerUp = PowerUpType.EatGhost;
                             Score += 50;
+                            ghostManager.MakeGhostsVulnerable();
+                            PowerUpTimer.StartTimer(EatGhostTime);
                             break;
                     }
+        }
+
+        void UpdateTimers(float deltaTime)
+        {
+            GraceTimer.Update(deltaTime);
+            PowerUpTimer.Update(deltaTime);
         }
 
         public void Draw(SpriteBatch spriteBatch)
@@ -123,10 +145,10 @@ namespace Pacman.GameObjects
 
             for (int x = 1; x < 9; x++)
             {
-                if (x%2 == 0)
-                    spriteframes[x] = new(19, 15*((x-1)/2)+1, 16, 16);
+                if (x % 2 == 0)
+                    spriteframes[x] = new(19, 15 * ((x - 1) / 2) + 1, 16, 16);
                 else
-                    spriteframes[x] = new(3, 15*(x/2)+1, 16, 16);
+                    spriteframes[x] = new(3, 15 * (x / 2) + 1, 16, 16);
             }
 
             //for (int x = 0; x < 11;x++)
@@ -337,24 +359,66 @@ namespace Pacman.GameObjects
 
             if (nextDes.HasValue)
             {
-                if (NextMoveIndex.HasValue)
+                if (desTile.Type == TileType.Teleporter && desTile.TeleporterExit.HasValue && TileMap[CurrentTile.Y, CurrentTile.X].Type != TileType.Teleporter)
                 {
-                    LastMoveIndex = NextMoveIndex.Value;
-                    NextMoveIndex = null;
-                }
+                    Point teleporterExit = TileMap[DestinationTile.Value.Y, DestinationTile.Value.X].TeleporterExit.Value;
+                    Rectangle teleporterDestRec = TileMap[teleporterExit.Y, teleporterExit.X].DestinationRec;
+                    if (IsTileValid(new(teleporterExit.X, teleporterExit.Y)))
+                    {
+                        DestinationRec.X = teleporterDestRec.X;
+                        DestinationRec.Y = teleporterDestRec.Y;
+                        CurrentTile = teleporterExit;
+                        if (NextMoveIndex.HasValue)
+                        {
+                            LastMoveIndex = NextMoveIndex.Value;
+                            NextMoveIndex = null;
+                        }
+                        
+                        switch(moveDirection)
+                        {
+                            case 0:
+                                nextDes = new(CurrentTile.X, CurrentTile.Y - 1);
+                                break;
+                            case 1:
+                                nextDes = new(CurrentTile.X, CurrentTile.Y + 1);
+                                break;
+                            case 2:
+                                nextDes = new(CurrentTile.X - 1, CurrentTile.Y);
+                                break;
+                            case 3:
+                                nextDes = new(CurrentTile.X + 1, CurrentTile.Y);
+                                break;
+                        }
 
-                CurrentTile = DestinationTile.Value;
+                        if (IsTileValid(nextDes.Value))
+                            DestinationTile = nextDes;
 
-                if (NextDestinationTile.HasValue)
-                {
-                    DestinationTile = NextDestinationTile.Value;
-                    NextDestinationTile = null;
+                        else
+                            StopMoving();
+                    }
                 }
-                else if (IsTileValid(nextDes.Value))
-                    DestinationTile = nextDes;
 
                 else
-                    StopMoving();
+                {
+                    if (NextMoveIndex.HasValue)
+                    {
+                        LastMoveIndex = NextMoveIndex.Value;
+                        NextMoveIndex = null;
+                    }
+
+                    CurrentTile = DestinationTile.Value;
+
+                    if (NextDestinationTile.HasValue)
+                    {
+                        DestinationTile = NextDestinationTile.Value;
+                        NextDestinationTile = null;
+                    }
+                    else if (IsTileValid(nextDes.Value))
+                        DestinationTile = nextDes;
+
+                    else
+                        StopMoving();
+                }
             }
 
         }
@@ -382,7 +446,7 @@ namespace Pacman.GameObjects
 
                 if (Lives <= 0)
                 {
-                    CurrentState = PlayerState.Dead;
+                    Die();
                 }
 
                 GraceTimer.StartTimer(GraceDuration);
@@ -405,7 +469,12 @@ namespace Pacman.GameObjects
 
         void Die()
         {
-            CurrentState = PlayerState.Dying;
+            CurrentState = PlayerState.Dead;
+        }
+
+        public void EatGhost()
+        {
+            Score += 100;
         }
     }
 }

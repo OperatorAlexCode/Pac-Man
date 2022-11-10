@@ -16,13 +16,17 @@ namespace Pacman.GameObjects
         public Rectangle DestinationRec;
         Rectangle SourceRec;
 
-        // Other
+        // Point
         public Point[] Exits;
+        public Point? TeleporterExit;
+
+        // Other
         Texture2D? Texture;
         float DrawLayer;
         ItemType? TileItem;
         bool ItemUsed;
         public TileType Type;
+        Color TileColor = Color.White;
 
         public Tile(Texture2D? texture, Rectangle destinationRec, Rectangle sourceRec, float drawLayer, TileType type, ItemType? tileItem = null)
         {
@@ -33,14 +37,25 @@ namespace Pacman.GameObjects
             Type = type;
             TileItem = tileItem;
             ItemUsed = false;
+
+            if (Type == TileType.Teleporter)
+            {
+                TileColor = Color.Purple;
+            }
         }
 
         public void Draw(SpriteBatch spriteBatch)
         {
-            if (Texture != null && !ItemUsed)
+            if (Type == TileType.Teleporter)
             {
-                spriteBatch.Draw(Texture, DestinationRec, SourceRec, Color.White, 0f, new Vector2(), SpriteEffects.None, DrawLayer);
+                Texture2D background = new(spriteBatch.GraphicsDevice,1,1);
+                background.SetData(new[] { Color.White });
+                spriteBatch.Draw(background, DestinationRec, SourceRec, TileColor, 0f, new Vector2(), SpriteEffects.None, DrawLayer);
             }
+                
+            else 
+            if (Texture != null && !ItemUsed)
+                spriteBatch.Draw(Texture, DestinationRec, SourceRec, TileColor, 0f, new Vector2(), SpriteEffects.None, DrawLayer);
         }
 
         public ItemType? UseItem()
@@ -56,6 +71,11 @@ namespace Pacman.GameObjects
         public bool HasItem()
         {
             return !ItemUsed;
+        }
+
+        public void SetTeleportDestination(Point newDestination)
+        {
+            TeleporterExit = newDestination;
         }
     }
 }

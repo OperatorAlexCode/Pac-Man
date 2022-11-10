@@ -6,10 +6,10 @@ using System.Threading.Tasks;
 
 namespace Pacman.Enums
 {
-    public enum ItemType
+    public enum GhostState
     {
-        Dot,
-        EatGhostPill,
-        Cherry
+        Normal,
+        Vulnerable,
+        Eaten
     }
 }

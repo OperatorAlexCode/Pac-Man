@@ -6,10 +6,8 @@ using System.Threading.Tasks;
 
 namespace Pacman.Enums
 {
-    public enum ItemType
+    public enum PowerUpType
     {
-        Dot,
-        EatGhostPill,
-        Cherry
+        EatGhost
     }
 }

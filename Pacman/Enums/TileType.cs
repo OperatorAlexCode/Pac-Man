@@ -9,6 +9,7 @@ namespace Pacman.Enums
     public enum TileType
     {
         Normal,
-        Wall
+        Wall,
+        Teleporter
     }
 }

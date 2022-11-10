@@ -1,6 +1,7 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
 using Pacman.Base_Classes;
+using Pacman.Enums;
 using Pacman.Utility;
 using System;
 using System.Collections.Generic;
@@ -18,9 +19,13 @@ namespace Pacman.GameObjects
             DestinationRec = destinationRec;
             Vel = vel;
             CurrentTile = currentTile;
+            SpawnPos = currentTile;
             DrawLayer = drawLayer;
             IsMoving = false;
             IsActive = true;
+            CurrentState = GhostState.Normal;
+            RespawnTimer = new();
+            VulnerablityTimer = new();
             AnimationManager = new(CreateSpriteFrames(81), .2f);
         }
 
@@ -43,7 +48,7 @@ namespace Pacman.GameObjects
 
                 if (availableExits.Length >= 1)
                     DestinationTile = GetRandomExit(availableExits);
-                else if (availableExits.Length == 0)
+                else
                     DestinationTile = GetRandomExit(exits);
 
                 BreakOut:

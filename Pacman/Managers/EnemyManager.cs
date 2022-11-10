@@ -10,6 +10,7 @@ namespace Pacman.Managers
 {
     public class EnemyManager
     {
+        bool VulnerablityDone = false;
         RandomJames? James;
         CommitmentJones? Jones;
         public EnemyManager()
@@ -76,6 +77,14 @@ namespace Pacman.Managers
                         Jones.Deactivate();
                     break;
             }
+        }
+
+        public void MakeGhostsVulnerable()
+        {
+            if (James != null)
+                James.MakeVunerable();
+            if (Jones != null)
+                Jones.MakeVunerable();
         }
     }
 }

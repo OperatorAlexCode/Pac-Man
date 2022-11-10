@@ -42,3 +42,5 @@ C:\Users\alexa\source\repos\Pacman\Pacman\bin\Debug\net6.0-windows\Content\GameF
 C:\Users\alexa\source\repos\Pacman\Pacman\bin\Debug\net6.0-windows\Content\PacManLogo.xnb
 C:\Users\alexa\source\repos\Pacman\Pacman\bin\Debug\net6.0-windows\Levels\Level1.txt
 C:\Users\alexa\source\repos\Pacman\Pacman\bin\Debug\net6.0-windows\Levels\Level2.txt
+C:\Users\alexa\source\repos\Pacman\Pacman\bin\Debug\net6.0-windows\Levels\Level3.txt
+C:\Users\alexa\source\repos\Pacman\Pacman\bin\Debug\net6.0-windows\Levels\LevelSecret.txt

@@ -1,8 +1,10 @@
 ﻿using Microsoft.Xna.Framework;
 using Microsoft.Xna.Framework.Graphics;
+using Pacman.Enums;
 using Pacman.GameObjects;
 using Pacman.Managers;
 using Pacman.Utility;
+using SharpDX.Direct3D11;
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -17,44 +19,84 @@ namespace Pacman.Base_Classes
         // Point
         protected Point CurrentTile;
         protected Point? DestinationTile;
+        protected Point SpawnPos;
 
         // Bool
         protected bool IsMoving;
         protected bool IsActive;
 
+        // Float
+        protected float DrawLayer;
+        protected float RespawnTime = 4.0f;
+        protected float VulnerablityTime = 8.0f;
+
+        // Timer
+        protected Timer RespawnTimer;
+        protected Timer VulnerablityTimer;
+
         // Other
-        protected Texture2D Tex;
+        protected Microsoft.Xna.Framework.Graphics.Texture2D Tex;
         protected Rectangle DestinationRec;
         protected Vector2 Vel;
-        protected float DrawLayer;
         protected int? MoveDirection;
         protected Tile[,] TileMap;
         protected GhostAnimationManager AnimationManager;
+        protected GhostState CurrentState;
 
         public void Update(float deltaTime, Player player)
         {
             if (IsActive)
             {
-                EnemyLogic();
+                UpdateTimers(deltaTime);
 
-                AnimationManager.Update(deltaTime, MoveDirection.Value);
+                if (VulnerablityTimer.IsDone())
+                    TurnNormal();
+
+                if (CurrentState == GhostState.Eaten && RespawnTimer.IsDone())
+                    Respawn();
+                
+                if (CurrentState != GhostState.Eaten)
+                    EnemyLogic();
+
+                AnimationManager.Update(deltaTime, MoveDirection.Value, CurrentState);
 
                 if (DestinationRec.Intersects(player.DestinationRec))
-                    player.GetHurt();
+                    switch (CurrentState)
+                    {
+                        case GhostState.Normal:
+                            player.GetHurt();
+                            break;
+                        case GhostState.Vulnerable:
+                            player.EatGhost();
+                            CurrentState = GhostState.Eaten;
+                            CurrentTile = SpawnPos;
+                            RespawnTimer.StartTimer(RespawnTime);
+                            break;
+                    }
             }
+        }
+
+        public void UpdateTimers(float deltaTime)
+        {
+            RespawnTimer.Update(deltaTime);
+            VulnerablityTimer.Update(deltaTime);
         }
 
         public void Draw(SpriteBatch spriteBatch)
         {
+            if (CurrentState != GhostState.Eaten)
             spriteBatch.Draw(Tex, DestinationRec, AnimationManager.GetCurrentFrame(), Color.White, 0.0f, Vector2.Zero, SpriteEffects.None, DrawLayer);
         }
 
         protected Rectangle[] CreateSpriteFrames(int spriteRow)
         {
-            Rectangle[] spriteFrames = new Rectangle[8];
+            Rectangle[] spriteFrames = new Rectangle[10];
 
             for (int x = 0; x < 8; x++)
                 spriteFrames[x] = new(4 + 16 * x, spriteRow, 14, 14);
+
+            spriteFrames[8] = new(132,65,14,14);
+            spriteFrames[9] = new(148,65,14,14);
 
             return spriteFrames;
         }
@@ -142,6 +184,26 @@ namespace Pacman.Base_Classes
         public virtual void EnemyLogic()
         {
             
+        }
+
+        public void MakeVunerable()
+        {
+            if (CurrentState != GhostState.Eaten)
+            {
+                CurrentState = GhostState.Vulnerable;
+                VulnerablityTimer.StartTimer(VulnerablityTime);
+            }     
+        }
+
+        public void TurnNormal()
+        {
+            CurrentState = GhostState.Normal;
+        }
+
+        protected void Respawn()
+        {
+            
+            CurrentState = GhostState.Normal;
         }
     }
 }

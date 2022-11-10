@@ -17,6 +17,9 @@ using Point = Microsoft.Xna.Framework.Point;
 using Pacman.Base_Classes;
 using System.Text.Encodings;
 using static System.Net.Mime.MediaTypeNames;
+using static System.Array;
+using SharpDX.Direct2D1;
+using SpriteBatch = Microsoft.Xna.Framework.Graphics.SpriteBatch;
 
 namespace Pacman.Managers
 {
@@ -49,15 +52,15 @@ namespace Pacman.Managers
         Rectangle TileSpecs;
         Rectangle DotSourceRec = new(49, 0, 8, 8);
         Rectangle CherrySourceRec = new(36, 49, 14, 14);
+        Rectangle EatGhostPillSourceRec = new(57,0,9,9);
 
         // Vector2
         Vector2 PlayerVel = new(3, 3);
         Vector2 GhostVel = new(2, 2);
 
         // Other
-        string[] Tiles = new string[] { "╋", "╞", "╨", "╚", "╡", "═", "╝", "╩", "╥", "╔", "║", "╠", "╗", "╦", "╣", "╬", "▵", "R", "C", "○", "🍒" };
+        string[] Tiles = new string[] { "╋", "╞", "╨", "╚", "╡", "═", "╝", "╩", "╥", "╔", "║", "╠", "╗", "╦", "╣", "╬", "▵", "R", "C", "■", "○", "◉", "🍒" };
         List<List<List<string>>> LevelsData;
-        
         Tile[,]? TileMap;
         EnemyManager GhostManager;
         Encoding EncodingType = Encoding.UTF8;
@@ -79,7 +82,7 @@ namespace Pacman.Managers
 
             LevelsData = new();
 
-            ReadLevelData();
+            ReadLevelData(ReadLevelFiles());
         }
 
         public void Draw(SpriteBatch spriteBatch)
@@ -92,12 +95,12 @@ namespace Pacman.Managers
             }
         }
 
-        void ReadLevelData()
+        void ReadLevelData(List<StreamReader> levels)
         {
-            List<StreamReader> levels = new() { new("Levels/Level1.txt", EncodingType), new("Levels/Level2.txt", EncodingType) };
-
             // Gets bytes from str, converts that to unicode bytes then decodes the bytes into a string
             Func<string,string> unicodeToString = str => EncodingType.GetString(Encoding.Convert(Encoding.Unicode, EncodingType, Encoding.Unicode.GetBytes(str)));
+
+            LevelsData = new();
 
             for (int x = 0; x < levels.Count; x++)
             {
@@ -147,6 +150,17 @@ namespace Pacman.Managers
             }
         }
 
+        List<StreamReader> ReadLevelFiles()
+        {
+            List<StreamReader> levels = new();
+
+            levels.Add(new("Levels/Level1.txt", EncodingType));
+            levels.Add(new("Levels/Level2.txt", EncodingType));
+            levels.Add(new("Levels/Level3.txt", EncodingType));
+
+            return levels;
+        }
+
         void LoadLevel(out Player playerOut)
         {
             TileSpecs = new();
@@ -166,6 +180,7 @@ namespace Pacman.Managers
             List<List<string>> currentLevel = LevelsData[CurrentLevel];
 
             Player player = null;
+            Point? teleportTile = null;
 
             GhostManager = new();
 
@@ -181,6 +196,16 @@ namespace Pacman.Managers
                     Player tempPlayer;
 
                     TileMap[y, x] = TileMaker(currentLevel[y][x], destinationRec, out tempPlayer);
+
+                    if (TileMap[y, x].Type == TileType.Teleporter && teleportTile.HasValue)
+                    {
+                        TileMap[y, x].SetTeleportDestination(new(teleportTile.Value.X, teleportTile.Value.Y));
+                        TileMap[teleportTile.Value.Y, teleportTile.Value.X].SetTeleportDestination(new(x,y));
+                        teleportTile = null; 
+                    }
+                    else if (TileMap[y, x].Type == TileType.Teleporter && !teleportTile.HasValue)
+                        teleportTile = new(x,y);
+
 
                     if (tempPlayer != null)
                         player = tempPlayer;
@@ -204,7 +229,7 @@ namespace Pacman.Managers
                 for (int x = 0; x < TileAmountX; x++)
                 {
                     Tile tile = TileMap[y, x];
-                    if (tile.Type == TileType.Normal)
+                    if (tile.Type != TileType.Wall)
                     {
                         List<Point> exits = new();
 
@@ -288,6 +313,12 @@ namespace Pacman.Managers
             LoadLevel(out playerOut);
         }
 
+        public void LoadSecretLevel(out Player playerOut, out EnemyManager ghostManager)
+        {
+            ReadLevelData(new List<StreamReader>() { new StreamReader("Levels/levelSecret.txt", EncodingType) });
+            LoadCurrentLevel(out playerOut, out ghostManager);
+        }
+
         Tile TileMaker(string str, Rectangle destinationRec, out Player? player)
         {
             Texture2D? texture = null;
@@ -295,11 +326,12 @@ namespace Pacman.Managers
             TileType type;
             float layer;
             ItemType? itemType = null;
-            int stringIndex = Array.IndexOf(Tiles, str);
+            int stringIndex = IndexOf(Tiles, str);
             Player? playerOut = null;
             Point entityTile = new((destinationRec.X - ScreenMarginX) / TileSpecs.Width, (destinationRec.Y - ScreenMarginY) / TileSpecs.Height);
+            int wallTileAmount = 16;
 
-            if (stringIndex >= 0 && stringIndex < 16)
+            if (stringIndex >= 0 && stringIndex < wallTileAmount)
             {
                 sourceRec = CreateWallSourceRec((int)MathF.Floor(stringIndex % 4), (int)MathF.Floor(stringIndex / 4));
                 texture = TileSpriteSheet;
@@ -331,8 +363,14 @@ namespace Pacman.Managers
                         layer = BackgroundLayer;
                         GhostManager.SetJones(new(PlayerEnemySpriteSheet, destinationRec, GhostVel, entityTile, EntityLayer));
                         break;
-                    // Dot tile
+                    // Teleporter Tile
                     case 19:
+                        sourceRec = new();
+                        type = TileType.Teleporter;
+                        layer = BackgroundLayer;
+                        break;
+                    // Dot tile
+                    case 20:
                         sourceRec = DotSourceRec;
                         texture = ItemSpriteSheet;
                         type = TileType.Normal;
@@ -340,8 +378,16 @@ namespace Pacman.Managers
                         itemType = ItemType.Dot;
                         PelletAmount++;
                         break;
+                    // Pill Tile
+                    case 21:
+                        sourceRec = EatGhostPillSourceRec;
+                        texture = ItemSpriteSheet;
+                        type = TileType.Normal;
+                        layer = ItemLayer;
+                        itemType = ItemType.EatGhostPill;
+                        break;
                     // Cherry Tile
-                    case 20:
+                    case 22:
                         sourceRec = CherrySourceRec;
                         texture = PlayerEnemySpriteSheet;
                         type = TileType.Normal;
