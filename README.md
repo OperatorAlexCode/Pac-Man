@@ -1,5 +1,10 @@
 # Pac-Man
 
+## Usage
+* Download and unzip
+* Double clikc exe located in
+Pac-Man/Pacman/bin/Debug/net6.0-windows
+
 ## Controlls
 * WASD or arrowkeys to move
 * Enter on main menu to start from beginning
